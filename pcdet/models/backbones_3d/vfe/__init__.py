@@ -3,6 +3,7 @@ from .pillar_vfe import PillarVFE
 from .dynamic_mean_vfe import DynamicMeanVFE
 from .dynamic_pillar_vfe import DynamicPillarVFE
 from .image_vfe import ImageVFE
+from .pillar_vfe_loc import PillarVFELOC
 from .vfe_template import VFETemplate
 
 __all__ = {
@@ -12,4 +13,5 @@ __all__ = {
     'ImageVFE': ImageVFE,
     'DynMeanVFE': DynamicMeanVFE,
     'DynPillarVFE': DynamicPillarVFE,
+    'PillarVFELOC': PillarVFELOC
 }

@@ -15,6 +15,7 @@ class PointPillarScatter(nn.Module):
         pillar_features, coords = batch_dict['pillar_features'], batch_dict['voxel_coords']
         batch_spatial_features = []
         batch_size = coords[:, 0].max().int().item() + 1
+        import pdb; pdb.set_trace()
         for batch_idx in range(batch_size):
             spatial_feature = torch.zeros(
                 self.num_bev_features,
@@ -32,6 +33,7 @@ class PointPillarScatter(nn.Module):
             batch_spatial_features.append(spatial_feature)
 
         batch_spatial_features = torch.stack(batch_spatial_features, 0)
-        batch_spatial_features = batch_spatial_features.view(batch_size, self.num_bev_features * self.nz, self.ny, self.nx)
+        batch_spatial_features = batch_spatial_features.view(batch_size, self.num_bev_features * self.nz, self.ny, self.nx)     # 
         batch_dict['spatial_features'] = batch_spatial_features
+        pdb.set_trace()
         return batch_dict

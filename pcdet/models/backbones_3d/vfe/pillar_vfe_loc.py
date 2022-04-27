@@ -1,9 +1,12 @@
+from audioop import bias
+from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from .vfe_template import VFETemplate
 
+import pdb;
 
 class PFNLayer(nn.Module):
     def __init__(self,
@@ -39,7 +42,8 @@ class PFNLayer(nn.Module):
         x = self.norm(x.permute(0, 2, 1)).permute(0, 2, 1) if self.use_norm else x
         torch.backends.cudnn.enabled = True
         x = F.relu(x)
-        x_max = torch.max(x, dim=1, keepdim=True)[0]
+        x_max, max_index = torch.max(x, dim=1, keepdim=True)        # max pooling   # 每个特征由一个点贡献
+        pdb.set_trace()
 
         if self.last_vfe:
             return x_max
@@ -49,7 +53,31 @@ class PFNLayer(nn.Module):
             return x_concatenated
 
 
-class PillarVFE(VFETemplate):
+class VoteModule(nn.Module):
+    def __init__(self, in_channels, num_offsets):
+        '''
+        input:
+        return offset: [0-7] offset prediction, [8-9] center residual
+        '''
+        self.num_offsets = num_offsets
+        self.linear1 = nn.Linear(in_channels, in_channels, bias=False)
+        self.norm1 = nn.BatchNorm1d(in_channels)
+        self.linear2 = nn.Linear(in_channels, in_channels, bias=False)
+        self.norm2 = nn.BatchNorm1d(in_channels)
+        self.linear3 = nn.Linear(in_channels, in_channels, bias=False)
+        self.norm3 = nn.BatchNorm1d(in_channels)
+        self.offset = nn.Linear(in_channels, num_offsets)
+        
+    def forward(self, voxel_features, voxel_coords):
+        fc_feature = F.relu(self.bn1(self.linear1(voxel_features)))
+        fc_feature = F.relu(self.bn2(self.linear2(fc_feature)))
+        fc_feature = F.relu(self.bn3(self.linear3(fc_feature)))
+        offset = self.offset(fc_feature)
+        offset[:, :, self.num_offsets-3:self.num_offsets-1] = voxel_coords + offset[:, :, self.num_offsets-3:self.num_offsets-1]
+        return offset
+
+
+class PillarVFELOC(VFETemplate):
     def __init__(self, model_cfg, num_point_features, voxel_size, point_cloud_range, **kwargs):
         super().__init__(model_cfg=model_cfg)
 
@@ -113,6 +141,7 @@ class PillarVFE(VFETemplate):
             points_dist = torch.norm(voxel_features[:, :, :3], 2, 2, keepdim=True)
             features.append(points_dist)
         features = torch.cat(features, dim=-1)
+        pdb.set_trace()
 
         voxel_count = features.shape[1]
         mask = self.get_paddings_indicator(voxel_num_points, voxel_count, axis=0)
@@ -120,6 +149,7 @@ class PillarVFE(VFETemplate):
         features *= mask
         for pfn in self.pfn_layers:
             features = pfn(features)
+        pdb.set_trace()
         features = features.squeeze()
         batch_dict['pillar_features'] = features
         return batch_dict       # 对每一个voxel内的pillar进行特征提取
