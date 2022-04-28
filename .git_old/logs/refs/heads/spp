@@ -1,3 +1,0 @@
-0000000000000000000000000000000000000000 a35f429768b3aa6ea2e7cd0a6452e1fcb7671c8d wyddmw <spyderzsy@gmail.com> 1648126342 +0800	branch: Created from refs/remotes/origin/spp
-a35f429768b3aa6ea2e7cd0a6452e1fcb7671c8d 758e94c1b320188c248207804699f74f982f4a5e wyddmw <spyderzsy@gmail.com> 1651066655 +0800	commit: add some update
-758e94c1b320188c248207804699f74f982f4a5e 7ae4acc93127b6745714a98d84d03d84681fb528 wyddmw <spyderzsy@gmail.com> 1651155163 +0800	commit: add spatial propagation implementation
