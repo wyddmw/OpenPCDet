@@ -1,0 +1,14 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = github.com:wyddmw/RotPred.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "zsy_develop"]
+	remote = origin
+	merge = refs/heads/zsy_develop
+[branch "spp"]
+	remote = origin
+	merge = refs/heads/spp

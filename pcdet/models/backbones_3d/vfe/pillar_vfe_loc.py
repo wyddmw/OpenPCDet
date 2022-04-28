@@ -43,7 +43,6 @@ class PFNLayer(nn.Module):
         torch.backends.cudnn.enabled = True
         x = F.relu(x)
         x_max, max_index = torch.max(x, dim=1, keepdim=True)        # max pooling   # 每个特征由一个点贡献
-        pdb.set_trace()
 
         if self.last_vfe:
             return x_max
@@ -141,7 +140,6 @@ class PillarVFELOC(VFETemplate):
             points_dist = torch.norm(voxel_features[:, :, :3], 2, 2, keepdim=True)
             features.append(points_dist)
         features = torch.cat(features, dim=-1)
-        pdb.set_trace()
 
         voxel_count = features.shape[1]
         mask = self.get_paddings_indicator(voxel_num_points, voxel_count, axis=0)
@@ -149,7 +147,6 @@ class PillarVFELOC(VFETemplate):
         features *= mask
         for pfn in self.pfn_layers:
             features = pfn(features)
-        pdb.set_trace()
         features = features.squeeze()
         batch_dict['pillar_features'] = features
         return batch_dict       # 对每一个voxel内的pillar进行特征提取

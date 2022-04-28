@@ -31,6 +31,7 @@ class PointPillarScatter(nn.Module):
             pillars = pillars.t()
             spatial_feature[:, indices] = pillars
             batch_spatial_features.append(spatial_feature)
+            pdb.set_trace()
 
         batch_spatial_features = torch.stack(batch_spatial_features, 0)
         batch_spatial_features = batch_spatial_features.view(batch_size, self.num_bev_features * self.nz, self.ny, self.nx)     # 
