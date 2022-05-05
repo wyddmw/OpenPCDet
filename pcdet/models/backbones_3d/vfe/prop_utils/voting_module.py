@@ -53,7 +53,7 @@ class VotingModule(nn.Module):
         self.conv1 = nn.Conv1d(feature_channel, feature_channel, 1, bias=False)
         self.conv2 = nn.Conv1d(feature_channel, feature_channel, 1, bias=False)   
         self.offset = nn.Conv1d(feature_channel, 2, 1, bias=False)
-        #self.stride = nn.Conv1d(feature_channel, 1, 1, bias=False)
+        self.stride = nn.Conv1d(feature_channel, 1, 1, bias=False)
         self.prob = nn.Conv1d(feature_channel, 1, 1, bias=False)
         self.sigmoid = nn.Sigmoid()
         self.bn1 = nn.BatchNorm1d(feature_channel)
@@ -64,9 +64,9 @@ class VotingModule(nn.Module):
         voting_feature = F.relu(self.bn1(self.conv1(voting_feature)))
         voting_feature = F.relu(self.bn2(self.conv2(voting_feature)))
         centering_offset = self.offset(voting_feature)
-        #stride = F.relu(self.stride(voting_feature))
+        stride = F.relu(self.stride(voting_feature))
         prob = self.sigmoid(self.prob(voting_feature))
-        return centering_offset, prob
+        return centering_offset, stride, prob
 	
 
 if __name__ == '__main__':

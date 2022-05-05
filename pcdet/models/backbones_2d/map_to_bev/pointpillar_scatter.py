@@ -9,13 +9,15 @@ class PointPillarScatter(nn.Module):
         self.model_cfg = model_cfg
         self.num_bev_features = self.model_cfg.NUM_BEV_FEATURES
         self.nx, self.ny, self.nz = grid_size
+        #self.conv = nn.Conv2d(64, 64, 1, 1, bias=False)
+        self.conv = nn.Conv1d(64, 64, 1)
         assert self.nz == 1
 
     def forward(self, batch_dict, **kwargs):
         pillar_features, coords = batch_dict['pillar_features'], batch_dict['voxel_coords']
         batch_spatial_features = []
+        #pillar_features = self.conv(pillar_features)
         batch_size = coords[:, 0].max().int().item() + 1
-        import pdb; pdb.set_trace()
         for batch_idx in range(batch_size):
             spatial_feature = torch.zeros(
                 self.num_bev_features,
@@ -29,12 +31,13 @@ class PointPillarScatter(nn.Module):
             indices = indices.type(torch.long)
             pillars = pillar_features[batch_mask, :]
             pillars = pillars.t()
+            pillars = pillars.unsqueeze(dim=0)
+            pillars = self.conv(pillars).squeeze(dim=0)
             spatial_feature[:, indices] = pillars
             batch_spatial_features.append(spatial_feature)
-            pdb.set_trace()
 
         batch_spatial_features = torch.stack(batch_spatial_features, 0)
         batch_spatial_features = batch_spatial_features.view(batch_size, self.num_bev_features * self.nz, self.ny, self.nx)     # 
+        #batch_spatial_features = self.conv(batch_spatial_features)
         batch_dict['spatial_features'] = batch_spatial_features
-        pdb.set_trace()
         return batch_dict
