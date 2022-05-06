@@ -14,6 +14,7 @@ class AnchorHeadTemplate(nn.Module):
         self.model_cfg = model_cfg
         self.num_class = num_class
         self.class_names = class_names
+        self.grid_size = grid_size
         self.predict_boxes_when_training = predict_boxes_when_training
         self.use_multihead = self.model_cfg.get('USE_MULTIHEAD', False)
 

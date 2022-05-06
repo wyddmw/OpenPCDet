@@ -16,7 +16,6 @@ def get_grid_coord(feature):
 def normalize_grid(grid):
     # grid shape [N, H, W, 2]
     H, W = grid.shape[1], grid.shape[2]
-    print('H, W is ', H, W)
     grid_h = 2.0 * grid[:, :, :, 0] / (H - 1) - 1.0 
     grid_w = 2.0 * grid[:, :, :, 1] / (W - 1) - 1.0 
 
@@ -50,6 +49,6 @@ class DeformableSPP(nn.Module):
         sample_coordinate = sample_coordinate.view(N, H, W, 2)
         sample_coordinate = normalize_grid(sample_coordinate)
         propagated_feature_sampled = F.grid_sample(feature, sample_coordinate, mode='bilinear', padding_mode='zeros', align_corners=True)
-        propagated_feature_sampled = feature * weight + propagated_feature_sampled * (1 - weight) 
+        propagated_feature_sampled = feature * (1 - weight) + propagated_feature_sampled * weight 
         return propagated_feature_sampled
 

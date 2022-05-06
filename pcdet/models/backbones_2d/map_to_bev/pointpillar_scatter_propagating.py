@@ -44,7 +44,7 @@ class PointPillarScatterLOC(nn.Module):
             sparse_cls = torch.zeros(
                 1, self.nz * self.nx * self.ny,
                 dtype=torch.int,
-                device=pillar_features.device)
+                device=pillar_features.device) - 1
 
             batch_mask = coords[:, 0] == batch_idx
             this_coords = coords[batch_mask, :]
@@ -83,7 +83,7 @@ class PointPillarScatterLOC(nn.Module):
         batch_spatial_features = batch_spatial_features.view(batch_size, self.num_bev_features * self.nz, self.ny, self.nx)     #
         batch_centering_offset = batch_centering_offset.view(batch_size, 2, self.ny, self.nx).permute(0, 2, 3, 1)
         batch_prob = batch_prob.view(batch_size, 1, self.ny, self.nx)
-        batch_cls = batch_cls.view(batch_size, 1, self.ny, self.nx).permute(0, 2, 3, 1)
+        batch_cls = batch_cls.view(batch_size, self.ny, self.nx)
         propagate_feature = self.deform_spp(batch_spatial_features, batch_centering_offset, batch_prob)
         #batch_spatial_features = self.get_propagatated_feature(batch_spatial_features, batch_centering_offset, batch_step, batch_prob)
 
@@ -96,6 +96,5 @@ class PointPillarScatterLOC(nn.Module):
         batch_dict['spatial_features'] = propagate_feature
         batch_dict['centering_offset'] = batch_centering_offset
         batch_dict['batch_cls_index'] = batch_cls
-        import pdb; pdb.set_trace()
 
         return batch_dict
