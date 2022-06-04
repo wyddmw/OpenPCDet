@@ -7,6 +7,8 @@ from ..model_utils import model_nms_utils
 from ..model_utils import centernet_utils
 from ...utils import loss_utils
 
+from pcdet.utils.visualize import draw_bev_gt, draw_bev_pts
+
 
 class SeparateHead(nn.Module):
     def __init__(self, input_channels, sep_head_dict, init_bias=-2.19, use_bias=False):
@@ -118,14 +120,18 @@ class CenterHead(nn.Module):
         mask = gt_boxes.new_zeros(num_max_objs).long()
 
         x, y, z = gt_boxes[:, 0], gt_boxes[:, 1], gt_boxes[:, 2]
-        import pdb; pdb.set_trace()
         coord_x = (x - self.point_cloud_range[0]) / self.voxel_size[0] / feature_map_stride
         coord_y = (y - self.point_cloud_range[1]) / self.voxel_size[1] / feature_map_stride
+        import pdb; pdb.set_trace()
         coord_x = torch.clamp(coord_x, min=0, max=feature_map_size[0] - 0.5)  # bugfixed: 1e-6 does not work for center.int()
         coord_y = torch.clamp(coord_y, min=0, max=feature_map_size[1] - 0.5)  #
         center = torch.cat((coord_x[:, None], coord_y[:, None]), dim=-1)
+        # assign center gt
+        self.center = center
         center_int = center.int()
         center_int_float = center_int.float()
+        
+        self.center = center_int
 
         dx, dy, dz = gt_boxes[:, 3], gt_boxes[:, 4], gt_boxes[:, 5]
         dx = dx / self.voxel_size[0] / feature_map_stride
@@ -237,6 +243,7 @@ class CenterHead(nn.Module):
 
             target_boxes = target_dicts['target_boxes'][idx]
             pred_boxes = torch.cat([pred_dict[head_name] for head_name in self.separate_head_cfg.HEAD_ORDER], dim=1)
+            import pdb; pdb.set_trace()
 
             reg_loss = self.reg_loss_func(
                 pred_boxes, target_dicts['masks'][idx], target_dicts['inds'][idx], target_boxes
@@ -324,6 +331,7 @@ class CenterHead(nn.Module):
 
     def forward(self, data_dict):
         spatial_features_2d = data_dict['spatial_features_2d']
+        import pdb; pdb.set_trace()
         x = self.shared_conv(spatial_features_2d)
 
         pred_dicts = []
@@ -352,5 +360,30 @@ class CenterHead(nn.Module):
                 data_dict['has_class_labels'] = True
             else:
                 data_dict['final_box_dicts'] = pred_dicts
+
+        draw_bev = True
+        if draw_bev:
+            import cv2
+            import os
+            voxel_coords = data_dict['voxel_coords']
+            batch_size = data_dict['batch_size']
+            visual_dir = './center_dir'
+            for batch_id in range(batch_size):
+                frame_id = data_dict['frame_id'][batch_id]
+                frame_center_path = os.path.join(visual_dir, 'center_%s.png'%frame_id)
+                frame_gt_path = os.path.join(visual_dir, 'gt_%s.png'%frame_id)
+                gt_boxes = data_dict['gt_boxes'][batch_id].cpu().numpy()
+                voxel_coord = voxel_coords[voxel_coords[:, 0]==batch_id][:, 1:].cpu().numpy()[:, ::-1]
+                draw_bev_gt(frame_gt_path, voxel_coord, gt_boxes, area_scope = [[0, 70.4], [-40, 40], [-3, 1]], cmap_color = False, voxel_size = [0.05, 0.05, 0.1])
+                N, C, H, W = spatial_features_2d.shape
+                import pdb; pdb.set_trace()
+                center_img = np.zeros([H, W, 3], dtype=np.uint8)
+                center_img = center_img.reshape(-1, 3)
+                center_index = self.center[:, 1] * W + self.center[:, 0]
+                center_index = center_index.int()
+                center_img[center_index] = (255, 255, 255)
+                center_img = center_img.reshape(H, W, 3)
+                cv2.imwrite(frame_center_path, center_img)
+                import pdb; pdb.set_trace()
 
         return data_dict

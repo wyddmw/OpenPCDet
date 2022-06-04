@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .anchor_head_template import AnchorHeadTemplate
+from pcdet.utils.visualize import draw_bev_gt, draw_bev_pts
 
 
 class AnchorHeadSingleSPP(AnchorHeadTemplate):
@@ -13,6 +14,7 @@ class AnchorHeadSingleSPP(AnchorHeadTemplate):
             model_cfg=model_cfg, num_class=num_class, class_names=class_names, grid_size=grid_size, point_cloud_range=point_cloud_range,
             predict_boxes_when_training=predict_boxes_when_training
         )
+        self.model_cfg = model_cfg
         self.voxel_size_x = model_cfg['VOXEL_SIZE'][0]
         self.voxel_size_y = model_cfg['VOXEL_SIZE'][1]
         self.x_range = model_cfg['POINT_CLOUD_RANGE'][0]
@@ -52,17 +54,23 @@ class AnchorHeadSingleSPP(AnchorHeadTemplate):
         gt_center_grid_coords_w = (gt_center_coords[:, :, 0] - self.x_range) / self.voxel_size_x
         gt_center_grid_coords_h = (gt_center_coords[:, :, 1] - self.y_range) / self.voxel_size_y
         gt_center_grid = torch.stack((gt_center_grid_coords_h, gt_center_grid_coords_w), dim=-1)
+        gt_center_grid = gt_center_grid.int()
+        self.gt_center_grid = gt_center_grid.int()
         grid_coords = torch.stack(torch.meshgrid(
             torch.arange(grid_H),
             torch.arange(grid_W),
-        ), dim=-1).to(center_offset_pred.device).unsqueeze(dim=0).repeat(N, 1, 1, 1)
-        grid_coords = grid_coords.view(N, -1, 2) 
-        target_center_offset = torch.zeros(center_offset_pred.shape, device=center_offset_pred.device).view(N, -1, C)       # N, num_grid, 2
-        
+        ), dim=-1).to(center_offset_pred.device).unsqueeze(dim=0).repeat(N, 1, 1, 1).view(N, -1, 2).int()
+        #grid_coords = grid_coords.view(N, -1, 2) 
+        target_center_offset = torch.zeros(center_offset_pred.shape, device=center_offset_pred.device, dtype=torch.int32).view(N, -1, C)       # N, num_grid, 2
+         
         cls_index = data_dict['batch_cls_index'].reshape(N, -1).long()
+        self.center_grid_cls = torch.zeros((N, H, W, 2), device=center_offset_pred.device).view(N, -1, 2).int()
         for i in range(N):
             cur_index = cls_index[i] > -1
-            target_center_offset[i][cur_index] = gt_center_grid[i][cls_index[i][cur_index]] - grid_coords[i, cur_index]
+            gt_cls_center = gt_center_grid[i][cls_index[i][cur_index]]
+            self.center_grid_cls[i][cur_index] = gt_cls_center
+            target_center_offset[i][cur_index] = grid_coords[i][cur_index] - gt_cls_center
+
         target_center_offset = target_center_offset.view(N, H, W, C)
         return target_center_offset
 
@@ -74,7 +82,8 @@ class AnchorHeadSingleSPP(AnchorHeadTemplate):
         centering_offset_target = self.forward_ret_dict['target_center_offset']
         N, H, W = centering_offset_pred.shape[:-1]
         valid_mask = (self.forward_ret_dict['valid_mask'] > -1).view(N, H, W, 1)
-        centering_loss = F.smooth_l1_loss(centering_offset_pred*valid_mask, centering_offset_target*valid_mask, reduce=False).sum() / valid_mask.sum() * 0.1
+        centering_loss = F.smooth_l1_loss(centering_offset_pred, centering_offset_target.float()) * 10
+        import pdb; pdb.set_trace()
         tb_dict.update(tb_dict_box)
         rpn_loss = cls_loss + box_loss + centering_loss
 
@@ -83,6 +92,7 @@ class AnchorHeadSingleSPP(AnchorHeadTemplate):
 
 
     def forward(self, data_dict):
+
         spatial_features_2d = data_dict['spatial_features_2d']
 
         cls_preds = self.conv_cls(spatial_features_2d)
@@ -120,4 +130,43 @@ class AnchorHeadSingleSPP(AnchorHeadTemplate):
             data_dict['batch_box_preds'] = batch_box_preds
             data_dict['cls_preds_normalized'] = False
 
+        draw_bev = True
+        if draw_bev:
+            import cv2
+            import os
+            voxel_coords = data_dict['voxel_coords']
+            batch_size = data_dict['batch_size']
+            visual_dir = './visualize'
+            for batch_id in range(batch_size):
+                frame_id = data_dict['frame_id'][batch_id]
+                frame_pts_path = os.path.join(visual_dir, 'pts_%s.png'%frame_id)
+                frame_gt_path = os.path.join(visual_dir, 'gt_%s.png'%frame_id)
+                gt_boxes = data_dict["gt_boxes"][batch_id].cpu().numpy() # (K, 7)
+                voxel_coord = voxel_coords[voxel_coords[:,0]==batch_id][:,1:].cpu().numpy()[:, ::-1]
+                draw_bev_pts(frame_pts_path, voxel_coord, gt_boxes, area_scope = [[0, 69.12], [-39.68, 39.68], [-3, 1]], cmap_color = False, voxel_size = self.model_cfg['VOXEL_SIZE'])
+                draw_bev_gt(frame_gt_path, voxel_coord, gt_boxes, area_scope = [[0, 69.12], [-39.68, 39.68], [-3, 1]], cmap_color = False, voxel_size = self.model_cfg['VOXEL_SIZE'])
+
+            draw_center = True
+            if draw_center:
+                center_dir = os.path.join(visual_dir, 'center_%s.png'%frame_id)
+                inside_dir = os.path.join(visual_dir, 'inside_%s.png'%frame_id)
+
+                N, H, W, C = target_center_offset.shape
+                for frame_id in range(batch_size):
+                    #inside_mask = data_dict['batch_cls_index'][frame_id] != -1
+                    inside_mask = target_center_offset[frame_id].sum(-1) != 0
+                    inside_mask = inside_mask.reshape(-1).data.cpu().numpy()
+                    center_img = np.zeros([H, W, 3], dtype=np.uint8).reshape(-1, 3)
+                    inside_img = np.zeros([H, W, 3], dtype=np.uint8).reshape(-1, 3)
+                    #center_mask = self.gt_center_grid[frame_id, :, 0] * W + self.gt_center_grid[frame_id, :, 1]
+                    center_mask = self.center_grid_cls[frame_id, :, 0] * W + self.center_grid_cls[frame_id, :, 1]
+                    center_mask = center_mask.int().data.cpu().numpy() 
+                    center_img[center_mask] = (255, 255, 0)
+                    inside_img[center_mask] = (255, 255, 0)
+                    inside_img[inside_mask] = (255, 255, 255)
+                    center_img = center_img.reshape(H, W, 3)
+                    inside_img = inside_img.reshape(H, W, 3)
+                    cv2.imwrite(center_dir, center_img)
+                    cv2.imwrite(inside_dir, inside_img)
+                    
         return data_dict
