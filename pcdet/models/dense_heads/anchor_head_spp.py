@@ -55,20 +55,19 @@ class AnchorHeadSingleSPP(AnchorHeadTemplate):
         gt_center_grid_coords_h = (gt_center_coords[:, :, 1] - self.y_range) / self.voxel_size_y
         gt_center_grid = torch.stack((gt_center_grid_coords_h, gt_center_grid_coords_w), dim=-1)
         gt_center_grid = gt_center_grid.int()
-        self.gt_center_grid = gt_center_grid.int()
+        #self.gt_center_grid = gt_center_grid.int()
         grid_coords = torch.stack(torch.meshgrid(
             torch.arange(grid_H),
             torch.arange(grid_W),
         ), dim=-1).to(center_offset_pred.device).unsqueeze(dim=0).repeat(N, 1, 1, 1).view(N, -1, 2).int()
-        #grid_coords = grid_coords.view(N, -1, 2) 
         target_center_offset = torch.zeros(center_offset_pred.shape, device=center_offset_pred.device, dtype=torch.int32).view(N, -1, C)       # N, num_grid, 2
          
         cls_index = data_dict['batch_cls_index'].reshape(N, -1).long()
-        self.center_grid_cls = torch.zeros((N, H, W, 2), device=center_offset_pred.device).view(N, -1, 2).int()
+        #self.center_grid_cls = torch.zeros((N, H, W, 2), device=center_offset_pred.device).view(N, -1, 2).int()
         for i in range(N):
             cur_index = cls_index[i] > -1
             gt_cls_center = gt_center_grid[i][cls_index[i][cur_index]]
-            self.center_grid_cls[i][cur_index] = gt_cls_center
+            #self.center_grid_cls[i][cur_index] = gt_cls_center
             target_center_offset[i][cur_index] = grid_coords[i][cur_index] - gt_cls_center
 
         target_center_offset = target_center_offset.view(N, H, W, C)
@@ -83,7 +82,6 @@ class AnchorHeadSingleSPP(AnchorHeadTemplate):
         N, H, W = centering_offset_pred.shape[:-1]
         valid_mask = (self.forward_ret_dict['valid_mask'] > -1).view(N, H, W, 1)
         centering_loss = F.smooth_l1_loss(centering_offset_pred, centering_offset_target.float()) * 10
-        import pdb; pdb.set_trace()
         tb_dict.update(tb_dict_box)
         rpn_loss = cls_loss + box_loss + centering_loss
 
@@ -130,7 +128,7 @@ class AnchorHeadSingleSPP(AnchorHeadTemplate):
             data_dict['batch_box_preds'] = batch_box_preds
             data_dict['cls_preds_normalized'] = False
 
-        draw_bev = True
+        draw_bev = False
         if draw_bev:
             import cv2
             import os
