@@ -107,27 +107,21 @@ class PillarVFELOC(VFETemplate):
 
         if self.use_absolute_xyz:
             features = [voxel_features, f_cluster, f_center]
-            features_center = [voxel_features, f_cluster, f_center]
         else:
             features = [voxel_features[..., 3:], f_cluster, f_center]
-            features_center = [voxel_featuress[..., 3:], f_cluster, f_center] 
 
         if self.with_distance:
             points_dist = torch.norm(voxel_features[:, :, :3], 2, 2, keepdim=True)
             features.append(points_dist)
         features = torch.cat(features, dim=-1)
-        features_center = torch.cat(features_center, dim=-1)
 
         voxel_count = features.shape[1]
         mask = self.get_paddings_indicator(voxel_num_points, voxel_count, axis=0)
         mask = torch.unsqueeze(mask, -1).type_as(voxel_features)
         features *= mask
-        features_center *= mask
         for pfn in self.pfn_layers:
             features = pfn(features)
-            features_center = pfn(features_center)
         features = features.squeeze()
-        features_center = features_center.squeeze()
         batch_dict['pillar_features'] = features
-        batch_dict['pillar_features_center'] = features_center
+        import pdb; pdb.set_trace()
         return batch_dict       # 对每一个voxel内的pillar进行特征提取

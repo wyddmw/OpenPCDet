@@ -21,7 +21,6 @@ class PointPillarScatterLOC(nn.Module):
 
     def forward(self, batch_dict, **kwargs):
         pillar_features, coords = batch_dict['pillar_features'], batch_dict['voxel_coords']
-        pillar_features_center = batch_dict['pillar_features_center']
         batch_spatial_features = []
         batch_centering_offset = []
         batch_step = []
@@ -62,14 +61,11 @@ class PointPillarScatterLOC(nn.Module):
             gt_boxes = gt_boxes.unsqueeze(dim=0)
 
             pillars = pillar_features[batch_mask, :]
-            pillars_center = pillar_features_center[batch_mask, :]
             pillars = pillars.t()
-            pillars_center = pillars_center.t()
             pillars = pillars.unsqueeze(dim=0)
-            pillars_center = pillars_center.unsqueeze(dim=0)
             
             #offset, prob = self.voting_module(pillars) 
-            offset = self.voting_module(pillars_center)
+            offset = self.voting_module(pillars)
 
             spatial_feature[:, indices] = pillars.squeeze(dim=0)
             centering_offset[:, indices] = offset
